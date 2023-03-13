@@ -3,6 +3,8 @@ pragma solidity ^0.8.8;
 
 interface BatchIERC721 {
     function mintMultiple(address receiver, uint256 amount) external;
+
+    function getOwner() external view returns (address);
 }
 
 /// @title Contrato para compra compartilhada de itens tokenizados.
@@ -14,13 +16,14 @@ interface BatchIERC721 {
 /// @custom:experimental Esse contrato é uma ideia experimental.
 
 contract SharedEconomy {
-    error TokensAlreadyClaimed();
+    error AlreadyClaimed();
     error BatchOngoing(uint256 currentTime, uint256 timeLimit);
     error BatchExpired(uint256 currentTime, uint256 timeLimit);
     error BatchCompleted();
     error InsufficientValue(uint256 msgValue, uint256 itemsValue);
     error CancelAmountTooLarge(uint256 amount, uint256 itemsBought);
     error FailedToSendEther();
+    error NotNFTOwner();
 
     struct Batch {
         address NFT;
@@ -30,9 +33,9 @@ contract SharedEconomy {
         uint256 timeLimit;
         mapping(address => uint256) addressBuyCount;
         mapping(address => bool) claims;
+        bool paymentsClaimedByOwner;
     }
 
-    uint256 batchIndex;
     Batch[] public batches;
 
     /// @notice Permite a criação de um lote para venda.
@@ -45,21 +48,24 @@ contract SharedEconomy {
         uint256 _itemPrice,
         uint256 _timeLimit
     ) external {
-        Batch storage b = batches[batchIndex];
+        if (msg.sender != BatchIERC721(_NFT).getOwner()) {
+            revert NotNFTOwner();
+        }
+        batches.push();
+        Batch storage b = batches[batches.length - 1];
         b.NFT = _NFT;
         b.itemCount = _itemCount;
         b.itemPrice = _itemPrice;
         b.timeLimit = _timeLimit;
-        batchIndex++;
     }
 
     /// @notice Permite a compra de itens de um lote.
     /// @param batchIndex o índice do lote no array `batches`.
     /// @param amount a quantidade de itens a comprar.
-    function buyItemFromBatch(
-        uint256 batchIndex,
-        uint256 amount
-    ) external payable {
+    function buyItemFromBatch(uint256 batchIndex, uint256 amount)
+        external
+        payable
+    {
         Batch storage b = batches[batchIndex];
         if (b.buyCount + amount > b.itemCount) {
             revert BatchCompleted();
@@ -94,9 +100,9 @@ contract SharedEconomy {
 
         b.buyCount -= amount;
         b.addressBuyCount[msg.sender] -= amount;
-        (bool sent, bytes memory data) = msg.sender.call{
-            value: addressBuyCount * b.itemPrice
-        }("");
+        (bool sent, ) = msg.sender.call{value: addressBuyCount * b.itemPrice}(
+            ""
+        );
         if (!sent) {
             revert FailedToSendEther();
         }
@@ -112,7 +118,7 @@ contract SharedEconomy {
         }
 
         if (b.claims[msg.sender]) {
-            revert TokensAlreadyClaimed();
+            revert AlreadyClaimed();
         }
 
         uint256 claimable = b.addressBuyCount[msg.sender];
@@ -120,11 +126,44 @@ contract SharedEconomy {
         BatchIERC721(b.NFT).mintMultiple(msg.sender, claimable);
     }
 
+    /// @notice Permite que o dono do lote resgate os pagamentos.
+    /// @param batchIndex o índice do lote no array `batches`
+    function claimPayments(uint256 batchIndex) external {
+        Batch storage b = batches[batchIndex];
+
+        if (msg.sender != BatchIERC721(b.NFT).getOwner()) {
+            revert NotNFTOwner();
+        }
+
+        if (block.timestamp < b.timeLimit) {
+            revert BatchOngoing(block.timestamp, b.timeLimit);
+        }
+
+        if (b.paymentsClaimedByOwner) {
+            revert AlreadyClaimed();
+        }
+
+        b.paymentsClaimedByOwner = true;
+
+        (bool sent, ) = msg.sender.call{value: b.buyCount * b.itemPrice}("");
+        if (!sent) {
+            revert FailedToSendEther();
+        }
+    }
+
     /// @notice Retorna informações sobre um lote.
     /// @param batchIndex o índice do lote no array `batches`
-    function getBatchInfo(
-        uint256 batchIndex
-    ) external view returns (address, uint256, uint256, uint256, uint256) {
+    function getBatchInfo(uint256 batchIndex)
+        external
+        view
+        returns (
+            address,
+            uint256,
+            uint256,
+            uint256,
+            uint256
+        )
+    {
         Batch storage b = batches[batchIndex];
         return (b.NFT, b.itemCount, b.itemPrice, b.buyCount, b.timeLimit);
     }
@@ -132,10 +171,11 @@ contract SharedEconomy {
     /// @notice Retorna informações de um usuário sobre um lote.
     /// @param batchIndex o índice do lote no array `batches`
     /// @param user o endereço de um usuário
-    function getUserBatchInfo(
-        uint256 batchIndex,
-        address user
-    ) external view returns (uint256, bool) {
+    function getUserBatchInfo(uint256 batchIndex, address user)
+        external
+        view
+        returns (uint256, bool)
+    {
         Batch storage b = batches[batchIndex];
         return (b.addressBuyCount[user], b.claims[user]);
     }

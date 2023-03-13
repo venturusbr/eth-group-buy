@@ -3,3 +3,7 @@ artifacts/
 cache/
 node_modules/
 images/
+gas-report.txt
+deploy/
+deployments/
+gas-report.txt

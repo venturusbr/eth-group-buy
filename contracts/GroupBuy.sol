@@ -15,7 +15,7 @@ interface BatchIERC721 {
 /// quando comprados em massa, a unidade custará y sendo y < x.
 /// @custom:experimental Esse contrato é uma ideia experimental.
 
-contract SharedEconomy {
+contract GroupBuy {
     error AlreadyClaimed();
     error BatchOngoing(uint256 currentTime, uint256 timeLimit);
     error BatchExpired(uint256 currentTime, uint256 timeLimit);

@@ -21,7 +21,7 @@ NFT_SYMBOL = "NOTEDELLXYZ";
 async function deployAndCreateBatch() {
   const [nftOwner, addr1, addr2] = await ethers.getSigners();
   const factoryNft = await ethers.getContractFactory("BasicNft");
-  const factorySharedEconomy = await ethers.getContractFactory("SharedEconomy");
+  const factorySharedEconomy = await ethers.getContractFactory("GroupBuy");
 
   const sharedEconomyContract = await factorySharedEconomy
     .connect(nftOwner)
@@ -42,7 +42,7 @@ async function deployAndCreateBatch() {
   return { nftContract, sharedEconomyContract, nftOwner, addr1, addr2 };
 }
 
-describe("Testes unitários do contrato SharedEconomy.sol", function () {
+describe("Testes unitários do contrato GroupBuy.sol", function () {
   describe("Criação de lote para venda.", function () {
     it("Verifica se um lote é criado corretamente.", async function () {
       const { nftContract, sharedEconomyContract, nftOwner, addr1, addr2 } =

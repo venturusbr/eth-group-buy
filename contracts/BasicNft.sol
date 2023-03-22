@@ -6,8 +6,8 @@ import "@openzeppelin/contracts/token/ERC721/ERC721.sol";
 contract BasicNftFactory{
     event NewNft(address nft);
     address[] public nfts;
-    function newNft(address _sharedEconomy, string memory _name, string memory _symbol) public returns (address){
-        BasicNft b = new BasicNft(_sharedEconomy, _name, _symbol, msg.sender);
+    function newNft(address _groupBy, string memory _name, string memory _symbol) public returns (address){
+        BasicNft b = new BasicNft(_groupBy, _name, _symbol, msg.sender);
         nfts.push(address(b));
         emit NewNft(address(b));
         return address(b);
@@ -19,19 +19,19 @@ contract BasicNft is ERC721 {
 
     string public _tokenURI;
     uint256 private s_tokenCounter;
-    address sharedEconomy;
+    address groupBuy;
     address owner;
 
-    constructor(address _sharedEconomy, string memory _name, string memory _symbol, address _owner)
+    constructor(address _groupBuy, string memory _name, string memory _symbol, address _owner)
         ERC721(_name, _symbol)
     {
         s_tokenCounter = 0;
-        sharedEconomy = _sharedEconomy;
+        groupBuy = _groupBuy;
         owner = _owner;
     }
 
     function mintMultiple(address receiver, uint256 amount) external {
-        if (msg.sender != sharedEconomy) {
+        if (msg.sender != groupBuy) {
             revert Unauthorized();
         }
         for (uint256 i = 0; i < amount; i++) {
